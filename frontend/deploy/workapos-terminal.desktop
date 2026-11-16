@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=WORKAPOS Terminal
+Comment=Touchscreen point of sale
+Exec=/usr/bin/workapos-terminal
+Icon=workapos-terminal
+Terminal=false
+Categories=Office;PointOfSale;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

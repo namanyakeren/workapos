@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: workapos-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-workapos_root}
+      MYSQL_DATABASE: workapos
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD:-workapos_root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  hq:
+    build:
+      context: ./backend
+    container_name: workapos-hq
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-workapos_root}@mysql:3306/workapos
+      JWT_SECRET: ${JWT_SECRET:-change-me-before-production}
+      BIND_ADDR: 0.0.0.0:8080
+      WEB_DIR: /app/web
+      UPLOAD_DIR: /app/uploads
+      SEED_DEMO: ${SEED_DEMO:-1}
+      SEED_ADMIN_PIN: ${SEED_ADMIN_PIN:-1234}
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  mysql-data:
+  uploads:

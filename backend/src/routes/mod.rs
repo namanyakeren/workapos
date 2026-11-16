@@ -1,0 +1,10 @@
+pub mod asset_routes;
+pub mod auth_routes;
+pub mod client_routes;
+pub mod crud;
+pub mod pos_routes;
+pub mod printer_routes;
+pub mod report_routes;
+pub mod ticket_routes;
+pub mod user_routes;
+pub mod ws_routes;

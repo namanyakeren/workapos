@@ -1,0 +1,33 @@
+[package]
+name = "workapos-terminal"
+version = "0.1.0"
+description = "WORKAPOS touchscreen POS terminal"
+authors = ["WORKAPOS"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "workapos_terminal_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "workapos-terminal"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "mysql", "json"] }
+url = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

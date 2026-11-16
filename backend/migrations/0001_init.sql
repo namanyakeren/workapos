@@ -1,0 +1,334 @@
+-- WORKAPOS HQ initial schema
+-- Money is stored as integer cents to avoid floating point drift.
+
+CREATE TABLE IF NOT EXISTS roles (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(80) NOT NULL,
+  description VARCHAR(255) NOT NULL DEFAULT '',
+  is_admin TINYINT(1) NOT NULL DEFAULT 0,
+  permissions JSON NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS brands (
+  id CHAR(36) PRIMARY KEY,
+  code VARCHAR(32) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  logo_url VARCHAR(500) NULL,
+  color VARCHAR(16) NOT NULL DEFAULT '#F59E0B',
+  currency CHAR(3) NOT NULL DEFAULT 'IDR',
+  timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
+  tax_rate DECIMAL(7,4) NOT NULL DEFAULT 0,
+  service_charge_rate DECIMAL(7,4) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS outlets (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  code VARCHAR(32) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  address VARCHAR(500) NOT NULL DEFAULT '',
+  phone VARCHAR(40) NOT NULL DEFAULT '',
+  timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Jakarta',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uniq_outlet_code (brand_id, code),
+  CONSTRAINT fk_outlet_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS clients (
+  id CHAR(36) PRIMARY KEY,
+  outlet_id CHAR(36) NOT NULL,
+  code VARCHAR(48) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  kind VARCHAR(24) NOT NULL DEFAULT 'cashier',
+  token VARCHAR(96) NOT NULL UNIQUE,
+  second_display TINYINT(1) NOT NULL DEFAULT 0,
+  slideshow_interval_seconds INT NOT NULL DEFAULT 8,
+  settings JSON NULL,
+  app_version VARCHAR(40) NOT NULL DEFAULT '',
+  status VARCHAR(24) NOT NULL DEFAULT 'offline',
+  last_seen_at DATETIME(6) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_client_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS users (
+  id CHAR(36) PRIMARY KEY,
+  nik VARCHAR(40) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  pin_hash VARCHAR(120) NOT NULL,
+  role_id CHAR(36) NOT NULL,
+  brand_id CHAR(36) NULL,
+  outlet_id CHAR(36) NULL,
+  avatar_color VARCHAR(16) NOT NULL DEFAULT '#F59E0B',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  last_login_at DATETIME(6) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES roles(id),
+  CONSTRAINT fk_user_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL,
+  CONSTRAINT fk_user_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS printers (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(120) NOT NULL,
+  purpose VARCHAR(24) NOT NULL DEFAULT 'receipt',
+  ip VARCHAR(64) NOT NULL,
+  port INT NOT NULL DEFAULT 9100,
+  paper_width INT NOT NULL DEFAULT 80,
+  model VARCHAR(80) NOT NULL DEFAULT '',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_printer_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_printer_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_modes (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(80) NOT NULL,
+  code VARCHAR(40) NOT NULL DEFAULT '',
+  icon VARCHAR(40) NOT NULL DEFAULT 'utensils',
+  color VARCHAR(16) NOT NULL DEFAULT '#F59E0B',
+  template VARCHAR(32) NOT NULL DEFAULT 'fast_food',
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_mode_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_mode_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS floor_tables (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NOT NULL,
+  table_type VARCHAR(32) NOT NULL DEFAULT 'regular',
+  number VARCHAR(24) NOT NULL,
+  name VARCHAR(80) NOT NULL,
+  seats INT NOT NULL DEFAULT 4,
+  zone VARCHAR(60) NOT NULL DEFAULT 'Main',
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uniq_table_number (outlet_id, number),
+  CONSTRAINT fk_table_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_table_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_groups (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(16) NOT NULL DEFAULT '#F59E0B',
+  icon VARCHAR(40) NOT NULL DEFAULT 'chef-hat',
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_pgroup_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pgroup_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS products (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  group_id CHAR(36) NOT NULL,
+  sku VARCHAR(64) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  description VARCHAR(500) NOT NULL DEFAULT '',
+  price_cents BIGINT NOT NULL DEFAULT 0,
+  image_url VARCHAR(500) NULL,
+  color VARCHAR(16) NOT NULL DEFAULT '#F59E0B',
+  emoji VARCHAR(16) NOT NULL DEFAULT '🍽️',
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  KEY idx_product_scope (brand_id, outlet_id, active),
+  CONSTRAINT fk_product_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_product_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_product_group FOREIGN KEY (group_id) REFERENCES product_groups(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payment_groups (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(80) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_paygroup_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_paygroup_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payment_types (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  group_id CHAR(36) NOT NULL,
+  code VARCHAR(40) NOT NULL DEFAULT '',
+  name VARCHAR(80) NOT NULL,
+  method VARCHAR(32) NOT NULL DEFAULT 'cash',
+  icon VARCHAR(40) NOT NULL DEFAULT 'banknote',
+  requires_reference TINYINT(1) NOT NULL DEFAULT 0,
+  open_drawer TINYINT(1) NOT NULL DEFAULT 0,
+  surcharge_rate DECIMAL(7,4) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_paytype_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_paytype_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE,
+  CONSTRAINT fk_paytype_group FOREIGN KEY (group_id) REFERENCES payment_groups(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS promotions (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(120) NOT NULL,
+  code VARCHAR(40) NOT NULL DEFAULT '',
+  type VARCHAR(24) NOT NULL DEFAULT 'percentage',
+  scope VARCHAR(24) NOT NULL DEFAULT 'bill',
+  target_ids JSON NULL,
+  value BIGINT NOT NULL DEFAULT 0,
+  min_subtotal_cents BIGINT NOT NULL DEFAULT 0,
+  max_discount_cents BIGINT NULL,
+  start_at DATETIME(6) NULL,
+  end_at DATETIME(6) NULL,
+  auto_apply TINYINT(1) NOT NULL DEFAULT 1,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_promo_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_promo_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS display_assets (
+  id CHAR(36) PRIMARY KEY,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NULL,
+  name VARCHAR(160) NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  checksum CHAR(64) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  uploaded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_asset_brand FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_asset_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS bills (
+  id CHAR(36) PRIMARY KEY,
+  client_bill_id VARCHAR(96) NOT NULL,
+  bill_no VARCHAR(64) NOT NULL,
+  brand_id CHAR(36) NOT NULL,
+  outlet_id CHAR(36) NOT NULL,
+  client_id CHAR(36) NOT NULL,
+  user_id CHAR(36) NULL,
+  user_name VARCHAR(120) NOT NULL DEFAULT '',
+  table_id CHAR(36) NULL,
+  table_name VARCHAR(80) NOT NULL DEFAULT '',
+  sales_mode_id CHAR(36) NULL,
+  sales_mode_name VARCHAR(80) NOT NULL DEFAULT '',
+  status VARCHAR(24) NOT NULL DEFAULT 'paid',
+  subtotal_cents BIGINT NOT NULL DEFAULT 0,
+  discount_cents BIGINT NOT NULL DEFAULT 0,
+  service_cents BIGINT NOT NULL DEFAULT 0,
+  tax_cents BIGINT NOT NULL DEFAULT 0,
+  rounding_cents BIGINT NOT NULL DEFAULT 0,
+  total_cents BIGINT NOT NULL DEFAULT 0,
+  paid_cents BIGINT NOT NULL DEFAULT 0,
+  change_cents BIGINT NOT NULL DEFAULT 0,
+  payment_summary VARCHAR(255) NOT NULL DEFAULT '',
+  note VARCHAR(500) NOT NULL DEFAULT '',
+  customer_name VARCHAR(120) NOT NULL DEFAULT '',
+  created_at DATETIME(6) NOT NULL,
+  paid_at DATETIME(6) NULL,
+  synced_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uniq_client_bill (client_bill_id),
+  UNIQUE KEY uniq_bill_no (bill_no),
+  KEY idx_bill_report (brand_id, outlet_id, paid_at),
+  KEY idx_bill_outlet (outlet_id, paid_at),
+  CONSTRAINT fk_bill_brand FOREIGN KEY (brand_id) REFERENCES brands(id),
+  CONSTRAINT fk_bill_outlet FOREIGN KEY (outlet_id) REFERENCES outlets(id),
+  CONSTRAINT fk_bill_client FOREIGN KEY (client_id) REFERENCES clients(id),
+  CONSTRAINT fk_bill_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_bill_table FOREIGN KEY (table_id) REFERENCES floor_tables(id) ON DELETE SET NULL,
+  CONSTRAINT fk_bill_mode FOREIGN KEY (sales_mode_id) REFERENCES sales_modes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS bill_items (
+  id CHAR(36) PRIMARY KEY,
+  bill_id CHAR(36) NOT NULL,
+  product_id CHAR(36) NULL,
+  sku VARCHAR(64) NOT NULL DEFAULT '',
+  name VARCHAR(160) NOT NULL,
+  qty INT NOT NULL DEFAULT 1,
+  unit_price_cents BIGINT NOT NULL DEFAULT 0,
+  discount_cents BIGINT NOT NULL DEFAULT 0,
+  total_cents BIGINT NOT NULL DEFAULT 0,
+  note VARCHAR(255) NOT NULL DEFAULT '',
+  CONSTRAINT fk_item_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE,
+  CONSTRAINT fk_item_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payments (
+  id CHAR(36) PRIMARY KEY,
+  bill_id CHAR(36) NOT NULL,
+  payment_type_id CHAR(36) NULL,
+  method VARCHAR(32) NOT NULL DEFAULT 'cash',
+  name VARCHAR(80) NOT NULL DEFAULT '',
+  amount_cents BIGINT NOT NULL DEFAULT 0,
+  reference VARCHAR(120) NOT NULL DEFAULT '',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_payment_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_types(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS client_commands (
+  id CHAR(36) PRIMARY KEY,
+  client_id CHAR(36) NOT NULL,
+  action VARCHAR(64) NOT NULL,
+  payload JSON NULL,
+  status VARCHAR(24) NOT NULL DEFAULT 'queued',
+  created_by CHAR(36) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  delivered_at DATETIME(6) NULL,
+  CONSTRAINT fk_command_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NULL,
+  user_name VARCHAR(120) NOT NULL DEFAULT '',
+  action VARCHAR(80) NOT NULL,
+  entity VARCHAR(80) NOT NULL DEFAULT '',
+  entity_id CHAR(36) NULL,
+  detail JSON NULL,
+  ip VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  KEY idx_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,22 @@
+# Local secrets
+.env
+
+# Rust / backend
+backend/target/
+backend/uploads/
+backend/.env
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+frontend/node_modules/.tmp/
+
+# Build output and editor cruft
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
